@@ -46,4 +46,6 @@ def globe_url(sites: pd.DataFrame, colors: dict, imagery: dict, focus: tuple[flo
     pts = [dict(name=str(r["name"]), note=str(r["note"]), kind=str(r["kind"]), lat=float(r["lat"]),
                 lon=float(r["lon"]), color=colors.get(r["kind"], "#111827")) for _, r in sites.iterrows()]
     cfg = dict(base=CESIUM_BASE, sites=pts, imagery=imagery, focus=list(focus))
-    return "/app/static/globe.html?c=" + quote(json.dumps(cfg, ensure_ascii=False, separators=(",", ":")))
+    # ΣΧΕΤΙΚΗ διαδρομή (χωρίς "/" μπροστά): στο Streamlit Cloud το app ζει κάτω από το "/~/+/",
+    # οπότε το "/app/static/..." θα έδειχνε τη σελίδα φόρτωσης του Cloud (κύκλος που δεν τελειώνει).
+    return "app/static/globe.html?c=" + quote(json.dumps(cfg, ensure_ascii=False, separators=(",", ":")))

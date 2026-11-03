@@ -98,7 +98,11 @@ with tab_globe:
     earth_sites = sites[sites["body"] == "Earth"]
     mode = st.radio("Υδρόγειος της Γης", ["Λεπτομερής 3D με δορυφορικές εικόνες (θέλει internet)",
                                           "Απλή (λειτουργεί χωρίς internet)"], horizontal=True)
-    if mode.startswith("Λεπτομερής"):
+    if mode.startswith("Λεπτομερής") and not st.get_option("server.enableStaticServing"):
+        st.error("Η λεπτομερής υδρόγειος θέλει `enableStaticServing = true`, αλλά το Streamlit δεν βρήκε τη ρύθμιση. "
+                 "Τρέξτε το `streamlit run app.py` **μέσα από τον φάκελο analog-kit** (εκεί που είναι ο φάκελος "
+                 "`.streamlit`), ή: `streamlit run app.py --server.enableStaticServing true`.")
+    elif mode.startswith("Λεπτομερής"):
         c1, c2, c3 = st.columns([2, 2, 1])
         focus_name = c1.selectbox("Μετάβαση σε", ["Όλη η Γη"] + earth_sites["name"].tolist())
         img_name = c2.selectbox("Εικόνα", list(IMAGERY))
@@ -112,10 +116,9 @@ with tab_globe:
             r = earth_sites[earth_sites["name"] == focus_name].iloc[0]
             focus = (float(r["lat"]), float(r["lon"]), 60000.0)
         url = globe_url(earth_sites, KIND_COLORS, imagery_config(img_name, date.isoformat()), focus)
-        if hasattr(st, "iframe"):  # νεότερες εκδόσεις Streamlit
-            st.iframe(url, height=610)
-        else:
-            components.iframe(url, height=610)
+        # components.iframe βάζει το src αυτούσιο, οπότε η σχετική διαδρομή λύνεται σωστά και στο Cloud.
+        # (Το st.iframe δέχεται μόνο διαδρομές που ξεκινούν με "/", που στο Cloud δείχνουν σε λάθος σημείο.)
+        components.iframe(url, height=610)
         st.caption("Ροδέλα ποντικιού: ζουμ · αριστερό κλικ + σύρσιμο: περιστροφή · κλικ σε σημείο: πληροφορίες. "
                    "Οι εικόνες NASA φτάνουν τα 250 m/pixel· για περισσότερη λεπτομέρεια διαλέξτε Esri.")
     else:

@@ -8,7 +8,7 @@ scipy>=1.14
 scikit-learn>=1.5
 matplotlib>=3.9
 plotly>=6.0
-streamlit>=1.50
+streamlit==1.66.1  # σταθερή έκδοση: δοκιμασμένη, χωρίς εκπλήξεις σε redeploy
 jupyterlab>=4.2
 
 # Γεωχωρικά / DEM (LOLA, MOLA, Copernicus)
