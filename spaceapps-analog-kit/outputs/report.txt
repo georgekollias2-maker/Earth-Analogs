@@ -1,0 +1,10 @@
+Python 3.12.3 linux
+OK    imports/Βασικά: numpy 2.5.4, pandas 3.1.0, scipy 1.18.1, sklearn 1.9.1, matplotlib 3.11.2, plotly 7.1.0, streamlit 1.66.1
+OK    imports/Γεωχωρικά / DEM: rasterio 1.5.2, pyproj 3.8.0, xarray 2026.9.0, rioxarray 0.23.0, geopandas 1.2.0, shapely 2.2.0
+OK    imports/Δεδομένα NASA: earthaccess 0.19.0
+OK    1 Κατάταξη / AUC / ευστάθεια: Σελήνη→πεδίο κρατήρων 2, Άρης→πεδιάδα 2, AUC 1.00, ίδιο 1ο ανάλογο σε 93% από 2000 τυχαίες βαρύτητες (0.7s)
+OK    2 Πλανητικά CRS & κοινή ανάλυση: LOLA/MOLA/Copernicus-like αρχεία OK, Γη→Σελήνη 0.06 vs Γη→Άρης 1.45, κλίση P90 26.9° στα 80 m → 16.8° στα 480 m (1.2s)
+OK    3 Streamlit: το app τρέχει χωρίς σφάλμα (1ο ανάλογο: πεδίο κρατήρων 2) και απαντά στο http://localhost:43631 (2.5s)
+SKIP  4a Earthdata (MODIS NDVI): τρέξτε με --online
+SKIP  4b NASA POWER (κλίμα): τρέξτε με --online
+SKIP  4c DEM Σελήνη/Άρης/Γη: τρέξτε με --online

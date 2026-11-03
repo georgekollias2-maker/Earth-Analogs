@@ -1,0 +1,23 @@
+# NASA Space Apps 2026 - Earth Analogs - περιβάλλον ομάδας (δοκιμασμένο με Python 3.12)
+# Εγκατάσταση:  uv pip install -r requirements.txt   (ή pip install -r requirements.txt)
+
+# Βασικά
+numpy>=2.2
+pandas>=2.2
+scipy>=1.14
+scikit-learn>=1.5
+matplotlib>=3.9
+plotly>=6.0
+streamlit>=1.50
+jupyterlab>=4.2
+
+# Γεωχωρικά / DEM (LOLA, MOLA, Copernicus)
+rasterio>=1.4
+pyproj>=3.6
+xarray>=2025.1
+rioxarray>=0.18
+geopandas>=1.0
+shapely>=2.0
+
+# Δεδομένα NASA (MODIS κ.λπ. μέσω Earthdata Login)
+earthaccess>=0.12

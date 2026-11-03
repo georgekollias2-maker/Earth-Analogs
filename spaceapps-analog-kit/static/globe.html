@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<title>Earth Analogs – υδρόγειος</title>
+<style>
+  html, body, #globe { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+  #err { display: none; position: absolute; top: 0; left: 0; right: 0; padding: 12px;
+         font: 14px sans-serif; color: #fff; background: #b91c1c; }
+</style>
+</head>
+<body>
+<div id="globe"></div>
+<div id="err"></div>
+<script>
+// Λεπτομερής υδρόγειος (CesiumJS + δορυφορικές εικόνες). Οι ρυθμίσεις έρχονται από το app.py
+// στο ?c=<JSON>. Σερβίρεται ως κανονική σελίδα (static/), όχι ως HTML μέσα σε πλαίσιο: σε πλαίσιο
+// χωρίς origin η CesiumJS από το CDN δεν σχεδιάζει την επιφάνεια της Γης (μόνο αστέρια).
+(function () {
+  function fail(msg) {
+    const e = document.getElementById("err");
+    e.style.display = "block";
+    e.textContent = msg;
+  }
+  function esc(t) {
+    const d = document.createElement("div");
+    d.textContent = String(t);
+    return d.innerHTML;
+  }
+  let cfg;
+  try {
+    cfg = JSON.parse(new URLSearchParams(location.search).get("c"));
+  } catch (e) {
+    fail("Λείπουν οι ρυθμίσεις της υδρογείου.");
+    return;
+  }
+  window.CESIUM_BASE_URL = cfg.base;
+  const css = document.createElement("link");
+  css.rel = "stylesheet";
+  css.href = cfg.base + "Widgets/widgets.css";
+  document.head.appendChild(css);
+  const js = document.createElement("script");
+  js.src = cfg.base + "Cesium.js";
+  js.onerror = () => fail("Δεν φορτώθηκε η CesiumJS (χρειάζεται internet). Χρησιμοποιήστε την απλή υδρόγειο.");
+  js.onload = init;
+  document.head.appendChild(js);
+
+  function init() {
+    const viewer = new Cesium.Viewer("globe", {
+      baseLayer: false, baseLayerPicker: false, geocoder: false, navigationHelpButton: false,
+      animation: false, timeline: false, sceneModePicker: true, homeButton: true,
+      fullscreenButton: true, infoBox: true, selectionIndicator: true,
+    });
+    viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString("#1e3a5f");
+    const im = cfg.imagery;
+    const layer = viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+      url: im.url, subdomains: im.subdomains.length ? im.subdomains : undefined,
+      maximumLevel: im.max_level, credit: new Cesium.Credit(im.credit),
+    }));
+    let tileErrors = 0;
+    layer.imageryProvider.errorEvent.addEventListener(() => {
+      tileErrors += 1;
+      if (tileErrors === 20) fail("Οι εικόνες δεν φορτώνουν (" + im.credit + "). Ελέγξτε τη σύνδεση ή διαλέξτε άλλη εικόνα.");
+    });
+    for (const s of cfg.sites) {
+      viewer.entities.add({
+        name: s.name,
+        description: "<p>" + esc(s.note) + "</p><p>Τύπος: " + esc(s.kind) + "<br>" +
+                     s.lat.toFixed(3) + "°, " + s.lon.toFixed(3) + "°</p>",
+        position: Cesium.Cartesian3.fromDegrees(s.lon, s.lat),
+        point: {
+          pixelSize: 11, color: Cesium.Color.fromCssColorString(s.color),
+          outlineColor: Cesium.Color.WHITE, outlineWidth: 2, disableDepthTestDistance: 2.0e6,
+        },
+        label: {
+          text: s.name, font: "14px sans-serif", fillColor: Cesium.Color.WHITE,
+          outlineColor: Cesium.Color.BLACK, outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -14),
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 4.0e6),
+          disableDepthTestDistance: 2.0e6,
+        },
+      });
+    }
+    const [lat, lon, h] = cfg.focus;
+    viewer.camera.setView({ destination: Cesium.Cartesian3.fromDegrees(lon, lat, h) });
+    window.__globeReady = true;
+  }
+})();
+</script>
+</body>
+</html>
