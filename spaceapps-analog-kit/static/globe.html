@@ -48,9 +48,14 @@
   function init() {
     const viewer = new Cesium.Viewer("globe", {
       baseLayer: false, baseLayerPicker: false, geocoder: false, navigationHelpButton: false,
-      animation: false, timeline: false, sceneModePicker: true, homeButton: true,
+      animation: false, timeline: false, sceneModePicker: false, homeButton: true,
       fullscreenButton: true, infoBox: true, selectionIndicator: true,
+      scene3DOnly: true,
+      skyBox: false,              // χωρίς αστέρια: λιγότερα αρχεία να κατέβουν
+      requestRenderMode: true,    // σχεδιάζει μόνο όταν κάτι αλλάζει: πολύ λιγότερη CPU/GPU
+      maximumRenderTimeChange: Infinity,
     });
+    viewer.scene.globe.maximumScreenSpaceError = 3;  // λίγο λιγότερα πλακίδια (προεπιλογή 2)
     viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString("#1e3a5f");
     const im = cfg.imagery;
     const layer = viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
