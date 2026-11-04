@@ -240,8 +240,10 @@ def streamlit_demo() -> str:
     from streamlit.testing.v1 import AppTest
 
     at = AppTest.from_file(str(app), default_timeout=60).run()
-    if at.exception:
-        raise RuntimeError(f"το app.py έβγαλε σφάλμα: {at.exception[0].message}")
+    for option in at.radio[0].options:  # κάθε προβολή του app (Γη, Σελήνη & Άρης, Κατάταξη)
+        at.radio[0].set_value(option).run()
+        if at.exception:
+            raise RuntimeError(f"το app.py έβγαλε σφάλμα στην προβολή «{option}»: {at.exception[0].message}")
     best = at.metric[0].value if at.metric else "?"
 
     # (β) Ο web server ξεκινά και απαντά
@@ -343,13 +345,19 @@ def online_globe() -> str:
     with urllib.request.urlopen(req, timeout=60) as r:
         if r.status != 200:
             raise RuntimeError(f"CesiumJS: HTTP {r.status}")
-    cfg = globe3d.imagery_config("NASA VIIRS (Suomi NPP), 250 m", "2024-07-20")
-    tile = (cfg["url"].replace("{s}", "a").replace("{z}", "9").replace("{y}", "200").replace("{x}", "292"))
-    with urllib.request.urlopen(tile, timeout=60) as r:  # το πλακίδιο της Σαντορίνης στο ζουμ 9
-        ctype, size = r.headers.get("Content-Type", ""), len(r.read())
-    if "image" not in ctype or size < 1000:
-        raise RuntimeError(f"η NASA GIBS δεν έδωσε εικόνα ({ctype}, {size} bytes): {tile}")
-    return f"CesiumJS OK, πλακίδιο NASA GIBS για τη Σαντορίνη OK ({size // 1024} KB)"
+    sizes = []
+    # Το πλακίδιο της Σαντορίνης: Blue Marble (ζουμ 8) και ημερήσιο VIIRS (ζουμ 9)
+    for name, date, (z, y, x) in [("NASA Blue Marble (χωρίς σύννεφα), 500 m", None, (8, 100, 146)),
+                                  ("NASA VIIRS (Suomi NPP), ημερήσια, 250 m", "2024-07-20", (9, 200, 292))]:
+        cfg = globe3d.imagery_config(name, date)
+        tile = (cfg["url"].replace("{s}", "a").replace("{z}", str(z)).replace("{y}", str(y)).replace("{x}", str(x)))
+        with urllib.request.urlopen(tile, timeout=60) as r:
+            ctype, size = r.headers.get("Content-Type", ""), len(r.read())
+        if "image" not in ctype or size < 1000:
+            raise RuntimeError(f"η NASA GIBS δεν έδωσε εικόνα ({ctype}, {size} bytes): {tile}")
+        sizes.append(size)
+    size = sizes[0]
+    return f"CesiumJS OK, πλακίδια Σαντορίνης OK: Blue Marble {sizes[0] // 1024} KB, VIIRS {sizes[1] // 1024} KB"
 
 
 def online_dems() -> str:

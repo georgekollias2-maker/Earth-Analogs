@@ -29,6 +29,7 @@ KIND_COLORS = {"γνωστό ανάλογο": "#2563eb", "ελληνική υπ�
 HOVER = "<b>%{text}</b><br>%{customdata}<extra></extra>"
 
 
+@st.cache_data(show_spinner=False)
 def earth_globe(sites: pd.DataFrame, height: int = 560) -> go.Figure:
     """Γη σε ορθογραφική προβολή (υδρόγειος) με ακτογραμμές. Σύρετε για περιστροφή."""
     d = sites[sites["body"] == "Earth"]
@@ -52,10 +53,11 @@ def earth_globe(sites: pd.DataFrame, height: int = 560) -> go.Figure:
     return fig
 
 
+@st.cache_data(show_spinner=False)
 def body_globe(sites: pd.DataFrame, body: str, title: str, color: str, eye: dict, height: int = 420) -> go.Figure:
     """Σελήνη/Άρης ως 3D σφαίρα (δεν χρειάζεται χάρτη Γης). Στο κανονικό app μπορεί να μπει
     υφή ή ανάγλυφο από LOLA / MOLA (NASA Moon Trek / Mars Trek)."""
-    lat, lon = np.meshgrid(np.radians(np.linspace(-90, 90, 61)), np.radians(np.linspace(-180, 180, 121)))
+    lat, lon = np.meshgrid(np.radians(np.linspace(-90, 90, 31)), np.radians(np.linspace(-180, 180, 61)))
 
     def xyz(la, lo, r=1.0):
         la, lo = np.broadcast_arrays(la, lo)
@@ -66,10 +68,10 @@ def body_globe(sites: pd.DataFrame, body: str, title: str, color: str, eye: dict
                                showscale=False, hoverinfo="skip", lighting=dict(ambient=0.7, diffuse=0.6)))
     grid = dict(mode="lines", line=dict(color="rgba(255,255,255,0.35)", width=1), hoverinfo="skip", showlegend=False)
     for la0 in range(-60, 90, 30):  # παράλληλοι
-        gx, gy, gz = xyz(np.radians(la0), np.radians(np.linspace(-180, 180, 181)), 1.002)
+        gx, gy, gz = xyz(np.radians(la0), np.radians(np.linspace(-180, 180, 73)), 1.002)
         fig.add_trace(go.Scatter3d(x=gx, y=gy, z=gz, **grid))
     for lo0 in range(-180, 180, 30):  # μεσημβρινοί
-        gx, gy, gz = xyz(np.radians(np.linspace(-90, 90, 91)), np.radians(lo0), 1.002)
+        gx, gy, gz = xyz(np.radians(np.linspace(-90, 90, 37)), np.radians(lo0), 1.002)
         fig.add_trace(go.Scatter3d(x=gx, y=gy, z=gz, **grid))
     d = sites[sites["body"] == body]
     for kind, g in d.groupby("kind"):
@@ -91,47 +93,52 @@ def body_globe(sites: pd.DataFrame, body: str, title: str, color: str, eye: dict
 # (χρειάζεται enableStaticServing = true στο .streamlit/config.toml).
 GEO_CONFIG = {"topojsonURL": "app/static/"}
 
-tab_globe, tab_rank = st.tabs(["Υδρόγειος", "Κατάταξη (δοκιμή)"])
+@st.cache_data(show_spinner=False)
+def load_sites() -> pd.DataFrame:
+    return pd.read_csv(ROOT / "sites.csv")
 
-with tab_globe:
-    sites = pd.read_csv(ROOT / "sites.csv")
+
+def earth_detailed_view(sites: pd.DataFrame) -> None:
     earth_sites = sites[sites["body"] == "Earth"]
-    mode = st.radio("Υδρόγειος της Γης", ["Λεπτομερής 3D με δορυφορικές εικόνες (θέλει internet)",
-                                          "Απλή (λειτουργεί χωρίς internet)"], horizontal=True)
-    if mode.startswith("Λεπτομερής") and not st.get_option("server.enableStaticServing"):
+    if not st.get_option("server.enableStaticServing"):
         st.error("Η λεπτομερής υδρόγειος θέλει `enableStaticServing = true`, αλλά το Streamlit δεν βρήκε τη ρύθμιση. "
                  "Τρέξτε το `streamlit run app.py` **μέσα από τον φάκελο analog-kit** (εκεί που είναι ο φάκελος "
                  "`.streamlit`), ή: `streamlit run app.py --server.enableStaticServing true`.")
-    elif mode.startswith("Λεπτομερής"):
-        c1, c2, c3 = st.columns([2, 2, 1])
-        focus_name = c1.selectbox("Μετάβαση σε", ["Όλη η Γη"] + earth_sites["name"].tolist())
-        img_name = c2.selectbox("Εικόνα", list(IMAGERY))
-        date = c3.date_input("Ημερομηνία εικόνας", dt.date(2024, 7, 20), min_value=dt.date(2015, 11, 24),
-                             max_value=dt.date.today() - dt.timedelta(days=2),
-                             disabled=not IMAGERY[img_name]["nasa"],
-                             help="Οι εικόνες NASA είναι ημερήσιες: αν έχει σύννεφα, διαλέξτε άλλη μέρα.")
-        if focus_name == "Όλη η Γη":
-            focus = (30.0, 0.0, 2.0e7)
-        else:
-            r = earth_sites[earth_sites["name"] == focus_name].iloc[0]
-            focus = (float(r["lat"]), float(r["lon"]), 60000.0)
-        url = globe_url(earth_sites, KIND_COLORS, imagery_config(img_name, date.isoformat()), focus)
-        # components.iframe βάζει το src αυτούσιο, οπότε η σχετική διαδρομή λύνεται σωστά και στο Cloud.
-        # (Το st.iframe δέχεται μόνο διαδρομές που ξεκινούν με "/", που στο Cloud δείχνουν σε λάθος σημείο.)
-        components.iframe(url, height=610)
-        st.caption("Ροδέλα ποντικιού: ζουμ · αριστερό κλικ + σύρσιμο: περιστροφή · κλικ σε σημείο: πληροφορίες. "
-                   "Οι εικόνες NASA φτάνουν τα 250 m/pixel· για περισσότερη λεπτομέρεια διαλέξτε Esri.")
+        return
+    c1, c2, c3 = st.columns([2, 2, 1])
+    focus_name = c1.selectbox("Μετάβαση σε", ["Όλη η Γη"] + earth_sites["name"].tolist())
+    img_name = c2.selectbox("Εικόνα", list(IMAGERY))
+    date = c3.date_input("Ημερομηνία εικόνας", dt.date(2024, 7, 20), min_value=dt.date(2015, 11, 24),
+                         max_value=dt.date.today() - dt.timedelta(days=2),
+                         disabled=not IMAGERY[img_name]["dated"],
+                         help="Μόνο για τις ημερήσιες εικόνες VIIRS/MODIS: αν έχει σύννεφα, διαλέξτε άλλη μέρα.")
+    if focus_name == "Όλη η Γη":
+        focus = (30.0, 0.0, 2.0e7)
     else:
-        st.plotly_chart(earth_globe(sites), width="stretch", config=GEO_CONFIG)
+        r = earth_sites[earth_sites["name"] == focus_name].iloc[0]
+        focus = (float(r["lat"]), float(r["lon"]), 60000.0)
+    url = globe_url(earth_sites, KIND_COLORS, imagery_config(img_name, date.isoformat()), focus)
+    # components.iframe βάζει το src αυτούσιο, οπότε η σχετική διαδρομή λύνεται σωστά και στο Cloud.
+    # (Το st.iframe δέχεται μόνο διαδρομές που ξεκινούν με "/", που στο Cloud δείχνουν σε λάθος σημείο.)
+    components.iframe(url, height=610)
+    st.caption("Ροδέλα ποντικιού: ζουμ · αριστερό κλικ + σύρσιμο: περιστροφή · κλικ σε σημείο: πληροφορίες. "
+               "Blue Marble: χωρίς σύννεφα, 500 m/pixel. VIIRS/MODIS: 250 m αλλά με τα σύννεφα της ημέρας. "
+               "Για πολύ περισσότερη λεπτομέρεια: Esri (όχι δεδομένα NASA).")
 
+
+def moon_mars_view(sites: pd.DataFrame) -> None:
     c_moon, c_mars = st.columns(2)
     c_moon.plotly_chart(body_globe(sites, "Moon", "Σελήνη (θέα από νότια)", "#9ca3af", dict(x=0.2, y=0.2, z=-1.35)),
                         width="stretch")
     c_mars.plotly_chart(body_globe(sites, "Mars", "Άρης", "#c2410c", dict(x=-0.3, y=1.3, z=0.3)), width="stretch")
-    st.caption("Γνωστά γήινα ανάλογα, ελληνικές υποψήφιες περιοχές (υπόθεση προς έλεγχο) και περιοχές "
-               "βάσεων/αποστολών. Συντεταγμένες προσεγγιστικές· τις συμπληρώνει η ομάδα στο `sites.csv`.")
-    st.dataframe(sites.rename(columns={"name": "τοποθεσία", "body": "σώμα", "lat": "πλάτος", "lon": "μήκος",
-                                       "kind": "τύπος", "note": "σημείωση"}), hide_index=True, width="stretch")
+
+
+def sites_table(sites: pd.DataFrame) -> None:
+    with st.expander("Πίνακας τοποθεσιών"):
+        st.caption("Γνωστά γήινα ανάλογα, ελληνικές υποψήφιες περιοχές (υπόθεση προς έλεγχο) και περιοχές "
+                   "βάσεων/αποστολών. Συντεταγμένες προσεγγιστικές· τις συμπληρώνει η ομάδα στο `sites.csv`.")
+        st.dataframe(sites.rename(columns={"name": "τοποθεσία", "body": "σώμα", "lat": "πλάτος", "lon": "μήκος",
+                                           "kind": "τύπος", "note": "σημείωση"}), hide_index=True, width="stretch")
 
 
 def ranking_tab() -> None:
@@ -176,5 +183,19 @@ def ranking_tab() -> None:
         st.image(str(img))
 
 
-with tab_rank:
+# Πλοήγηση: σχεδιάζεται ΜΟΝΟ η προβολή που διαλέγει ο χρήστης. Με st.tabs ο browser θα φόρτωνε
+# ταυτόχρονα CesiumJS, δύο 3D γραφήματα και την κατάταξη, και η σελίδα θα άργει πολύ (ιδίως στο Cloud).
+VIEWS = ["Γη: λεπτομερής 3D (θέλει internet)", "Γη: απλή (χωρίς internet)", "Σελήνη & Άρης", "Κατάταξη (δοκιμή)"]
+view = st.radio("Προβολή", VIEWS, horizontal=True, label_visibility="collapsed")
+sites = load_sites()
+if view == VIEWS[0]:
+    earth_detailed_view(sites)
+    sites_table(sites)
+elif view == VIEWS[1]:
+    st.plotly_chart(earth_globe(sites), width="stretch", config=GEO_CONFIG)
+    sites_table(sites)
+elif view == VIEWS[2]:
+    moon_mars_view(sites)
+    sites_table(sites)
+else:
     ranking_tab()
