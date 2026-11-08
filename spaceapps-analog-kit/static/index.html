@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Earth Analogs</title>
+<!--
+  Φιλοξενία για το Streamlit app (app.py). Δείχνει μία σελίδα του site κάθε φορά
+  (το app στέλνει ποια: analogs.html ή mars.html). Το iframe παίρνει το ύψος του περιεχομένου
+  του (χωρίς δική του μπάρα κύλισης) και το ύψος στέλνεται στο Streamlit: κυλάει μόνο η σελίδα του app.
+-->
+<style>
+  html, body { margin: 0; background: transparent; }
+  iframe { display: block; width: 100%; border: 0; height: 900px; overflow: hidden; }
+</style>
+</head>
+<body>
+<iframe id="page" scrolling="no" title="Earth Analogs"></iframe>
+<script>
+function send(type, extra) {
+  try { window.parent.postMessage(Object.assign({ isStreamlitMessage: true, type }, extra || {}), "*"); } catch (e) {}
+}
+const frame = document.getElementById("page");
+let current = null, last = 0, ro = null;
+
+function show(page) {
+  if (!page || page === current) return;
+  current = page;
+  frame.style.height = "900px";
+  frame.src = page;
+}
+function fit() {
+  try {
+    const d = frame.contentDocument;
+    if (d && d.body) {
+      const h = Math.max(d.body.scrollHeight, d.documentElement.scrollHeight);
+      if (h && Math.abs(h - frame.offsetHeight) > 2) frame.style.height = h + "px";
+    }
+  } catch (e) { /* άλλο origin: μένει το προεπιλεγμένο ύψος */ }
+  const total = document.documentElement.scrollHeight;
+  if (total !== last) { last = total; send("streamlit:setFrameHeight", { height: total }); }
+}
+frame.addEventListener("load", () => {
+  fit();
+  try { if (ro) ro.disconnect(); ro = new ResizeObserver(fit); ro.observe(frame.contentDocument.body); } catch (e) {}
+});
+
+// Πρωτόκολλο components του Streamlit: το app στέλνει τα args σε κάθε render
+window.addEventListener("message", ev => {
+  const m = ev.data;
+  if (m && m.type === "streamlit:render") show((m.args && m.args.page) || "analogs.html");
+});
+send("streamlit:componentReady", { apiVersion: 1 });
+// εκτός Streamlit (άνοιγμα του αρχείου απευθείας): ?page=mars.html ή η πρώτη σελίδα
+setTimeout(() => { if (!current) show(new URLSearchParams(location.search).get("page") || "analogs.html"); }, 1500);
+window.addEventListener("resize", fit);
+setInterval(fit, 1000);
+</script>
+</body>
+</html>

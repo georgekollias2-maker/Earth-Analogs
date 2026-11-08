@@ -1,0 +1,3 @@
+body,target,lat,lon,Ls_deg,T_min_C,T_max_C,PW_kgm2,PS_Pa,slope_P90_deg,source,status
+Άρης,Gale (Curiosity),-4.6,137.4,18.3,-89.4,5.1,,613,,"MCD v6.2 στιγμιότυπα Ls 18.3/18.5: μέσος όρος σημείων ίδιου πλάτους, ±60° μήκος, τοπ. ώρα 3–6 h (min) και 12–14 h (max). Συμφωνεί με REMS (−91 / +3 °C)",εκτίμηση – αντικατάσταση με MCD daily max/min
+Άρης,Jezero (Perseverance),18.44,77.45,18.3,-99.7,-0.4,,741,,"MCD v6.2 στιγμιότυπα Ls 18.3/18.5: ίδια μέθοδος (min ±60°, max ±90° μήκος)",εκτίμηση – αντικατάσταση με MCD daily max/min

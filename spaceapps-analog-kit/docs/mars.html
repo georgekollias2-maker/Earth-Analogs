@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Χάρτης θερμοκρασίας Άρη</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+[hidden] { display: none !important; }
+/* Layout: one working sheet — controls row, equirectangular map with a local-time ruler on top, legend, site table. */
+:root {
+  --bg: #f6f4f3;
+  --surface: #fcfbfb;
+  --fg: #211b19;
+  --muted: #6c625e;
+  --line: #ddd5d1;
+  --grid: rgba(33, 27, 25, 0.16);
+  --accent: #ad4419;
+  --accent-soft: #f3dfd5;
+  --marker: #ffffff;
+  --marker-ring: #211b19;
+  /* sequential ramps: light = low, dark = high (light theme) */
+  --t0: #fdeee4; --t1: #f9cfb4; --t2: #f3a77d; --t3: #e57a47; --t4: #c55424; --t5: #973815; --t6: #62220a;
+  --p0: #e2eefc; --p1: #b7d3f6; --p2: #86b6ef; --p3: #5598e7; --p4: #2a78d6; --p5: #1c5cab; --p6: #0d366b;
+  --font-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141110; --surface: #1c1817; --fg: #efe8e5; --muted: #a4988f; --line: #3a3230;
+    --grid: rgba(239, 232, 229, 0.18); --accent: #ec8053; --accent-soft: #3a2219;
+    --marker: #141110; --marker-ring: #efe8e5;
+    --t0: #2a1710; --t1: #5a2410; --t2: #8f3714; --t3: #c5541f; --t4: #e9804a; --t5: #f6ae82; --t6: #fde3cf;
+    --p0: #0f1d33; --p1: #12305c; --p2: #184f95; --p3: #2a78d6; --p4: #5598e7; --p5: #9ec5f4; --p6: #dcebfd;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141110; --surface: #1c1817; --fg: #efe8e5; --muted: #a4988f; --line: #3a3230;
+  --grid: rgba(239, 232, 229, 0.18); --accent: #ec8053; --accent-soft: #3a2219;
+  --marker: #141110; --marker-ring: #efe8e5;
+  --t0: #2a1710; --t1: #5a2410; --t2: #8f3714; --t3: #c5541f; --t4: #e9804a; --t5: #f6ae82; --t6: #fde3cf;
+  --p0: #0f1d33; --p1: #12305c; --p2: #184f95; --p3: #2a78d6; --p4: #5598e7; --p5: #9ec5f4; --p6: #dcebfd;
+  color-scheme: dark;
+}
+body { margin: 0;
+  background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 40px;
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 20px; }
+header { display: grid; gap: 6px; }
+.eyebrow { font-family: var(--font-data); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--font-display); font-stretch: 78%; font-weight: 750; font-size: clamp(30px, 5vw, 46px); line-height: 1.02; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+.lede { margin: 0; color: var(--muted); max-width: 68ch; }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; }
+.field { display: grid; gap: 5px; min-width: 0; }
+.field > span { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { font: inherit; font-size: 14px; border: 0; background: transparent; color: var(--fg); padding: 7px 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.seg button:focus-visible, .check input:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.check { display: inline-flex; gap: 7px; align-items: center; font-size: 14px; padding-bottom: 7px; cursor: pointer; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; }
+.sheet { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 14px; min-width: 0; }
+.sheet-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 20px; align-items: baseline; }
+.sheet-head h2 { margin: 0; font-family: var(--font-display); font-stretch: 85%; font-weight: 700; font-size: 20px; }
+.meta { font-family: var(--font-data); font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.map-box { position: relative; width: 100%; }
+canvas#map { display: block; width: 100%; height: auto; touch-action: manipulation; cursor: crosshair; }
+[hidden] { display: none !important; }
+.gl { position: relative; height: 560px; border-radius: 10px; overflow: hidden; background: #05070d; }
+.gl .cesium-viewer-bottom { font-size: 10px; }
+@media (max-width: 760px) { .gl { height: 400px; } }
+.live { font-family: var(--font-data); font-size: 12px; color: var(--muted); }
+.live::before { content: "● "; color: #1baf7a; }
+.tip { position: absolute; pointer-events: none; background: var(--fg); color: var(--bg); font-family: var(--font-data); font-size: 12.5px; line-height: 1.45; padding: 7px 9px; border-radius: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; transform: translate(12px, -50%); z-index: 2; }
+.tip b { font-weight: 500; font-size: 14px; }
+.legend { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; align-items: center; }
+.legend .lab { font-size: 13px; color: var(--muted); }
+.legend canvas { width: 100%; height: 14px; border-radius: 3px; display: block; }
+.ticks { grid-column: 2; position: relative; height: 16px; font-family: var(--font-data); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.ticks span:first-child { transform: none; }
+.ticks span:last-child { transform: translateX(-100%); }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; }
+@media (max-width: 760px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; }
+td.num, th.num { text-align: right; font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+td .sub { color: var(--muted); font-size: 12.5px; }
+.notes { display: grid; gap: 10px; font-size: 14px; color: var(--muted); align-content: start; }
+.notes h3 { margin: 0; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--fg); }
+.notes p { margin: 0; max-width: 62ch; }
+.notes strong { color: var(--fg); font-weight: 600; }
+nav.top { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; }
+nav.top a { color: var(--accent); text-decoration: none; }
+nav.top a:hover { text-decoration: underline; }
+.err { color: var(--accent); font-weight: 600; }
+.foot { font-size: 12.5px; color: var(--muted); }
+@media (max-width: 520px) { .hide-sm { display: none; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <nav class="top"><a href="index.html">← Αρχική</a><a href="analogs.html">Ανάλογα ανά δοκιμή</a></nav>
+  <header>
+    <div class="eyebrow">Earth Analogs · NASA Space Apps 2026</div>
+    <h1>Χάρτης θερμοκρασίας Άρη</h1>
+    <p class="lede">Θερμοκρασία εδάφους, αέρα και πίεση σε όλο τον πλανήτη, από το Mars Climate Database. Περάστε τον κέρσορα ή πατήστε πάνω στον χάρτη για τιμές. Η πάνω κλίμακα δείχνει την τοπική ώρα: δυτικά του μεσημεριού είναι πρωί, ανατολικά απόγευμα.</p>
+  </header>
+
+  <div class="controls">
+    <div class="field"><span>Προβολή</span><div class="seg" id="pv" role="group" aria-label="Προβολή">
+      <button type="button" id="pv-globe">Υδρόγειος</button><button type="button" id="pv-map">Χάρτης</button></div></div>
+    <div class="field"><span>Στιγμιότυπο</span><div class="seg" id="ds" role="group" aria-label="Στιγμιότυπο"></div></div>
+    <div class="field"><span>Μέγεθος</span><div class="seg" id="vr" role="group" aria-label="Μέγεθος"></div></div>
+    <label class="check"><input type="checkbox" id="sites" checked> Τοποθεσίες αποστολών</label>
+    <label class="check"><input type="checkbox" id="smooth" checked> Λεία απόδοση</label>
+    <label class="check" id="nightf"><input type="checkbox" id="night"> Μέρα/νύχτα τώρα (live)</label>
+  </div>
+
+  <section class="sheet" aria-labelledby="maptitle">
+    <div class="sheet-head">
+      <h2 id="maptitle">Θερμοκρασία εδάφους</h2>
+      <div class="meta" id="meta"></div>
+    </div>
+    <div class="map-box" id="mapbox">
+      <canvas id="map" role="img" aria-label="Χάρτης του Άρη"></canvas>
+      <div class="gl" id="mglobe" hidden aria-label="Υδρόγειος του Άρη"></div>
+      <div class="tip" id="tip" hidden></div>
+    </div>
+    <div class="live" id="live"></div>
+    <div class="legend">
+      <div class="lab" id="unit">°C</div>
+      <canvas id="bar" height="14"></canvas>
+      <div class="ticks" id="ticks"></div>
+    </div>
+  </section>
+
+  <div class="grid2">
+    <section class="sheet" aria-labelledby="tbltitle">
+      <div class="sheet-head"><h2 id="tbltitle">Στις τοποθεσίες αποστολών</h2><div class="meta">πλησιέστερο σημείο πλέγματος · οι κουκκίδες στον χάρτη</div></div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Τοποθεσία</th><th class="num hide-sm">Θέση</th><th class="num">Τοπ. ώρα</th><th class="num" id="valhead">°C</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table></div>
+    </section>
+    <section class="sheet notes" aria-label="Πώς διαβάζεται">
+      <h3>Πώς διαβάζεται</h3>
+      <p><strong>Κάθε μήκος έχει άλλη ώρα.</strong> Το στιγμιότυπο είναι μία στιγμή για όλο τον πλανήτη, οπότε ο χάρτης δείχνει ταυτόχρονα μέρα και νύχτα. Η ζεστή λωρίδα ακολουθεί το μεσημέρι.</p>
+      <p><strong>Ls είναι η εποχή.</strong> Ls 0° είναι η αρχή της βόρειας άνοιξης, 90° του καλοκαιριού, 180° του φθινοπώρου, 270° του χειμώνα. Και τα δύο στιγμιότυπα είναι αρχή άνοιξης.</p>
+      <p><strong>Η πίεση ακολουθεί το υψόμετρο.</strong> Χαμηλή στα ηφαίστεια του Tharsis (Olympus Mons ~90 Pa), υψηλή στη λεκάνη Hellas (~1.200 Pa). Στη Γη, στο επίπεδο της θάλασσας, είναι 101.325 Pa.</p>
+      <p><strong>Ανάλυση:</strong> ~5,7° × 3,8° ανά σημείο, περίπου 340 × 225 km στον ισημερινό.</p>
+    </section>
+  </div>
+
+  <p class="foot">Δεδομένα: Mars Climate Database v6.2, κλιματολογικό σενάριο, ύψος αέρα 10 m (© LMD/OU/IAA/ESA/CNES). Δεν είναι δεδομένα NASA. Θέσεις αποστολών: δημοσιευμένες συντεταγμένες προσεδάφισης.</p>
+</div>
+
+<script src="globes.js"></script>
+<script>
+// μέσα στο Streamlit (iframe) η πλοήγηση του site δεν έχει νόημα
+try { if (window.self !== window.top) { const n = document.querySelector('nav.top'); if (n) n.hidden = true; } } catch (inIframe) {}
+fetch("data/mars_mcd.json").then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(boot).catch(e => {
+  document.getElementById("meta").innerHTML = "<span class='err'>Δεν βρέθηκε το data/mars_mcd.json. Τρέξτε python export_results.py.</span>";
+});
+
+function boot(DATA) {
+
+const VARS = {
+  ts: { name: "Θερμοκρασία εδάφους", unit: "°C", short: "Έδαφος °C", ramp: "t", min: -135, max: 15, fmt: v => v.toFixed(1) },
+  ta: { name: "Θερμοκρασία αέρα (10 m)", unit: "°C", short: "Αέρας °C", ramp: "t", min: -135, max: 15, fmt: v => v.toFixed(1) },
+  p:  { name: "Πίεση επιφάνειας", unit: "Pa", short: "Πίεση Pa", ramp: "p", min: 50, max: 1300, fmt: v => Math.round(v).toLocaleString("el-GR") }
+};
+const SITES = [
+  { n: "Gale", m: "Curiosity", lon: 137.4, lat: -4.6, dx: 8, dy: 14 },
+  { n: "Elysium", m: "InSight", lon: 135.6, lat: 4.5, dx: 8, dy: -6 },
+  { n: "Jezero", m: "Perseverance", lon: 77.45, lat: 18.44, dx: 8, dy: -6 },
+  { n: "Utopia", m: "Zhurong", lon: 109.9, lat: 25.1, dx: -8, dy: -6, left: true },
+  { n: "Utopia", m: "Viking 2", lon: 134.0, lat: 47.7, dx: 8, dy: 4 },
+  { n: "Chryse", m: "Viking 1", lon: -47.95, lat: 22.27, dx: 8, dy: -6 },
+  { n: "Meridiani", m: "Opportunity", lon: -5.53, lat: -1.95, dx: 8, dy: 4 },
+  { n: "Gusev", m: "Spirit", lon: 175.47, lat: -14.57, dx: -8, dy: 14, left: true },
+  { n: "Vastitas Borealis", m: "Phoenix", lon: -125.75, lat: 68.22, dx: 8, dy: 4 }
+];
+const REGIONS = [
+  { n: "Olympus Mons", lon: -133.8, lat: 18.65 },
+  { n: "Hellas", lon: 70, lat: -42 }
+];
+
+const state = { ds: 0, v: "ts", sites: true, smooth: true, view: "globe", night: false };
+try { const s = JSON.parse(localStorage.getItem("marsmap") || "{}"); Object.assign(state, s); } catch (e) {}
+if (typeof state.ds !== "number") state.ds = 0;
+if (!DATA[state.ds]) state.ds = 0;
+if (!VARS[state.v]) state.v = "ts";
+if (!window.Globes || !Globes.webglOK()) state.view = "map";
+function save() { try { localStorage.setItem("marsmap", JSON.stringify(state)); } catch (e) {} }
+
+const $ = id => document.getElementById(id);
+const canvas = $("map"), ctx = canvas.getContext("2d");
+const tip = $("tip");
+
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function hex(c) { c = c.replace("#", ""); return [0, 2, 4].map(i => parseInt(c.slice(i, i + 2), 16)); }
+function rampStops(k) { return [0,1,2,3,4,5,6].map(i => hex(css("--" + k + i))); }
+function colorAt(stops, t) {
+  t = Math.max(0, Math.min(1, t)) * (stops.length - 1);
+  const i = Math.min(stops.length - 2, Math.floor(t)), f = t - i, a = stops[i], b = stops[i + 1];
+  return [0,1,2].map(c => Math.round(a[c] + (b[c] - a[c]) * f));
+}
+function localTime(d, lon) { return ((d.lt0 + lon / 15) % 24 + 24) % 24; }
+function hhmm(h) { const m = Math.round(h * 60) % 1440; return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0"); }
+function lonLabel(l) { const a = Math.abs(Math.round(l * 10) / 10); return l === 0 ? "0°" : (l > 0 ? a + "°Α" : a + "°Δ"); }
+function latLabel(l) { const a = Math.abs(Math.round(l * 10) / 10); return l === 0 ? "0°" : (l > 0 ? a + "°Β" : a + "°Ν"); }
+
+// controls
+DATA.forEach((d, i) => {
+  const b = document.createElement("button"); b.type = "button"; b.id = "ds-" + d.key; b.textContent = d.label;
+  b.onclick = () => { state.ds = i; save(); render(); }; $("ds").append(b);
+});
+Object.entries(VARS).forEach(([k, v]) => {
+  const b = document.createElement("button"); b.type = "button"; b.id = "vr-" + k; b.textContent = v.short;
+  b.onclick = () => { state.v = k; save(); render(); }; $("vr").append(b);
+});
+$("sites").checked = state.sites; $("smooth").checked = state.smooth;
+$("sites").onchange = e => { state.sites = e.target.checked; save(); render(); };
+$("smooth").onchange = e => { state.smooth = e.target.checked; save(); render(); };
+$("night").checked = state.night;
+$("night").onchange = e => { state.night = e.target.checked; save(); if (MG) MG.setNight(state.night ? Globes.marsTime(new Date()) : null); };
+["globe", "map"].forEach(k => $("pv-" + k).onclick = () => { state.view = k; save(); render(); });
+
+// ---- υδρόγειος (globes.js) ----
+let MG = null, MGfail = null, MGstart = false, MGkey = null;
+function liveLine() {
+  if (!window.Globes) return;
+  const mt = Globes.marsTime(new Date());
+  $("live").textContent = "Τώρα στον Άρη: Ls " + Math.round(mt.ls) + "° (" + Globes.SEASON(mt.ls) + ") · ώρα στο Gale "
+    + Globes.hhmm(mt.ltst(137.4)) + ", στο Jezero " + Globes.hhmm(mt.ltst(77.45)) + " (Mars24). Το στιγμιότυπο του MCD είναι Ls "
+    + DATA[state.ds].ls.toLocaleString("el-GR") + "°.";
+  return mt;
+}
+setInterval(() => { const mt = liveLine(); if (MG && state.night) MG.setNight(mt); }, 60000);
+async function startGlobe() {
+  MGstart = true;
+  try {
+    MG = await Globes.mars($("mglobe"), { relief: false });
+    MG.setPoints(SITES.map(s => ({ id: s.m, name: s.m, lon: s.lon, lat: s.lat, size: 8, color: "#ffffff", ring: "#140f0d", label: s.m })));
+    MG.lookAt(110, 10, 1.05e7);
+    MG.onHover((g, pos) => {
+      if (!g) { tip.hidden = true; return; }
+      const d = DATA[state.ds], V = VARS[state.v], c = cellAt(d, g.lon, g.lat);
+      tip.innerHTML = "<b>" + V.fmt(d[state.v][c.k]) + " " + V.unit + "</b><br>" + latLabel(d.lats[c.j]) + "  " + lonLabel(d.lons[c.i]) + "<br>τοπική ώρα " + hhmm(localTime(d, d.lons[c.i]));
+      tip.hidden = false; tip.style.left = pos.x + "px"; tip.style.top = pos.y + "px";
+      tip.style.transform = pos.x > $("mglobe").clientWidth - 190 ? "translate(calc(-100% - 12px), -50%)" : "translate(12px, -50%)";
+    });
+    if (state.night) MG.setNight(Globes.marsTime(new Date()));
+    render();
+  } catch (err) {
+    MGfail = err.message || String(err); state.view = "map"; render();
+    $("meta").textContent += " · Η υδρόγειος δεν φόρτωσε: " + MGfail;
+  }
+}
+function updateGlobe(d, V, vals, stops) {
+  if (!MG) { if (!MGstart && !MGfail) startGlobe(); return; }
+  const key = [state.ds, state.v, state.smooth, css("--" + V.ramp + "0")].join("|");
+  if (key !== MGkey) {
+    MGkey = key;
+    MG.setOverlay(Globes.gridTexture(d, vals, v => colorAt(stops, (v - V.min) / (V.max - V.min)), state.smooth), 1);
+  }
+  MG.showPoints(state.sites);
+  MG.viewer.scene.requestRender();
+}
+
+let geom = null;
+
+function render() {
+  const d = DATA[state.ds], V = VARS[state.v], vals = d[state.v];
+  document.querySelectorAll("#ds button").forEach((b, i) => b.setAttribute("aria-pressed", i === state.ds));
+  document.querySelectorAll("#vr button").forEach(b => b.setAttribute("aria-pressed", b.id === "vr-" + state.v));
+  $("maptitle").textContent = V.name;
+  $("meta").textContent = "Ls " + d.ls.toLocaleString("el-GR") + "° · " + (d.utc ? d.utc + " UTC · " : "") + "τοπική ώρα στο 0°: " + hhmm(d.lt0);
+  $("unit").textContent = V.unit; $("valhead").textContent = V.unit;
+
+  const stops = rampStops(V.ramp);
+  const nlon = d.lons.length, nlat = d.lats.length;
+  const globe = state.view === "globe";
+  $("pv-globe").setAttribute("aria-pressed", globe); $("pv-map").setAttribute("aria-pressed", !globe);
+  $("mglobe").hidden = !globe; canvas.hidden = globe; $("nightf").hidden = !globe;
+  liveLine();
+  if (globe) updateGlobe(d, V, vals, stops);
+  if (!globe) {
+
+  // canvas size
+  const box = $("mapbox"), W = Math.max(300, box.clientWidth), narrow = W < 560;
+  const padL = narrow ? 34 : 44, padR = 10, padT = narrow ? 34 : 40, padB = narrow ? 22 : 26;
+  const pw = W - padL - padR, ph = pw / 2, H = Math.round(ph + padT + padB);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+  canvas.style.height = H + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const X = lon => padL + (lon + 180) / 360 * pw, Y = lat => padT + (90 - lat) / 180 * ph;
+  geom = { X, Y, padL, padT, pw, ph, d };
+
+  // data image (one pixel per grid point, extra column to wrap 180°)
+  const off = document.createElement("canvas"); off.width = nlon + 1; off.height = nlat;
+  const octx = off.getContext("2d"), img = octx.createImageData(nlon + 1, nlat);
+  for (let j = 0; j < nlat; j++) for (let i = 0; i <= nlon; i++) {
+    const v = vals[j * nlon + (i % nlon)], c = colorAt(stops, (v - V.min) / (V.max - V.min));
+    const k = ((nlat - 1 - j) * (nlon + 1) + i) * 4; img.data[k] = c[0]; img.data[k+1] = c[1]; img.data[k+2] = c[2]; img.data[k+3] = 255;
+  }
+  octx.putImageData(img, 0, 0);
+  const dlon = 360 / nlon, dlat = 180 / (nlat - 1);
+  ctx.save(); ctx.beginPath(); ctx.rect(padL, padT, pw, ph); ctx.clip();
+  ctx.imageSmoothingEnabled = state.smooth; ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(off, X(-180 - dlon / 2), Y(90 + dlat / 2), (nlon + 1) * dlon / 360 * pw, nlat * dlat / 180 * ph);
+
+  // graticule
+  ctx.strokeStyle = css("--grid"); ctx.lineWidth = 1;
+  for (let lon = -120; lon <= 120; lon += 60) { ctx.beginPath(); ctx.moveTo(Math.round(X(lon)) + .5, padT); ctx.lineTo(Math.round(X(lon)) + .5, padT + ph); ctx.stroke(); }
+  for (let lat = -60; lat <= 60; lat += 30) { ctx.beginPath(); ctx.moveTo(padL, Math.round(Y(lat)) + .5); ctx.lineTo(padL + pw, Math.round(Y(lat)) + .5); ctx.stroke(); }
+
+  // local noon / midnight lines
+  const fg = css("--fg"), muted = css("--muted");
+  [[12, "μεσημέρι"], [0, "μεσάνυχτα"]].forEach(([h, lab]) => {
+    let lon = ((h - d.lt0) * 15) % 360; if (lon >= 180) lon -= 360; if (lon < -180) lon += 360;
+    ctx.setLineDash([5, 4]); ctx.strokeStyle = fg; ctx.globalAlpha = .55; ctx.lineWidth = 1.25;
+    ctx.beginPath(); ctx.moveTo(X(lon), padT); ctx.lineTo(X(lon), padT + ph); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+  });
+
+  // regions
+  ctx.font = "italic 500 " + (narrow ? 10 : 12) + "px " + css("--font-body");
+  if (!narrow) REGIONS.forEach(r => {
+    label(r.n, X(r.lon), Y(r.lat), "center");
+  });
+
+  // sites
+  if (state.sites) {
+    ctx.font = "500 " + (narrow ? 10.5 : 12) + "px " + css("--font-body");
+    SITES.forEach(s => {
+      const x = X(s.lon), y = Y(s.lat);
+      ctx.beginPath(); ctx.arc(x, y, narrow ? 3.5 : 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = css("--marker"); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = css("--marker-ring"); ctx.stroke();
+      if (!narrow) label(s.m, x + s.dx, y + s.dy, s.left ? "right" : "left");
+    });
+  }
+  ctx.restore();
+
+  // frame
+  ctx.strokeStyle = css("--line"); ctx.lineWidth = 1; ctx.strokeRect(padL + .5, padT + .5, pw - 1, ph - 1);
+
+  // axes labels
+  ctx.fillStyle = muted; ctx.font = (narrow ? 10 : 11.5) + "px " + css("--font-data");
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  for (let lon = -180; lon <= 180; lon += narrow ? 90 : 60) ctx.fillText(lonLabel(lon), Math.min(Math.max(X(lon), padL + 14), padL + pw - 14), padT + ph + 6);
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (let lat = -90; lat <= 90; lat += narrow ? 45 : 30) ctx.fillText(latLabel(lat), padL - 6, Math.min(Math.max(Y(lat), padT + 6), padT + ph - 6));
+
+  // local-time ruler on top
+  ctx.textBaseline = "alphabetic"; ctx.textAlign = "center";
+  const step = narrow ? 6 : 3;
+  for (let h = 0; h < 24; h += step) {
+    let lon = ((h - d.lt0) * 15) % 360; if (lon >= 180) lon -= 360; if (lon < -180) lon += 360;
+    const x = X(lon);
+    ctx.strokeStyle = muted; ctx.beginPath(); ctx.moveTo(x, padT - 5); ctx.lineTo(x, padT); ctx.stroke();
+    const strong = h === 12 || h === 0;
+    ctx.fillStyle = strong ? fg : muted;
+    ctx.font = (strong ? "500 " : "") + (narrow ? 10 : 11.5) + "px " + css("--font-data");
+    ctx.fillText(hhmm(h), Math.min(Math.max(x, padL + 16), padL + pw - 16), padT - 9);
+  }
+  ctx.textAlign = "left"; ctx.fillStyle = muted; ctx.font = (narrow ? 10 : 11) + "px " + css("--font-body");
+  ctx.fillText("τοπική ώρα", padL, padT - (narrow ? 22 : 25));
+  }
+
+  // legend
+  const bar = $("bar"), bw = Math.max(200, bar.clientWidth), dpr = window.devicePixelRatio || 1;
+  bar.width = Math.round(bw * dpr); bar.height = Math.round(14 * dpr);
+  const bctx = bar.getContext("2d");
+  for (let x = 0; x < bar.width; x++) { const c = colorAt(stops, x / (bar.width - 1)); bctx.fillStyle = "rgb(" + c + ")"; bctx.fillRect(x, 0, 1, bar.height); }
+  const tk = $("ticks"); tk.innerHTML = "";
+  const tvals = state.v === "p" ? [50, 300, 550, 800, 1050, 1300] : [-135, -105, -75, -45, -15, 15];
+  tvals.forEach(v => { const s = document.createElement("span"); s.style.left = ((v - V.min) / (V.max - V.min) * 100) + "%"; s.textContent = V.fmt(v).replace(".0", ""); tk.append(s); });
+
+  // aria summary
+  let mn = Infinity, mx = -Infinity; vals.forEach(v => { if (v < mn) mn = v; if (v > mx) mx = v; });
+  canvas.setAttribute("aria-label", V.name + " στον Άρη, " + d.label + ". Από " + V.fmt(mn) + " έως " + V.fmt(mx) + " " + V.unit + ".");
+
+  // table
+  const tb = $("tbody"); tb.innerHTML = "";
+  SITES.forEach(s => {
+    const c = cellAt(d, s.lon, s.lat), tr = document.createElement("tr");
+    tr.innerHTML = "<td>" + s.n + " <span class='sub'>" + s.m + "</span></td><td class='num hide-sm'>" + latLabel(s.lat) + " " + lonLabel(s.lon) + "</td><td class='num'>" + hhmm(localTime(d, s.lon)) + "</td><td class='num'>" + V.fmt(vals[c.k]) + "</td>";
+    tb.append(tr);
+  });
+  tip.hidden = true;
+}
+
+function label(text, x, y, align) {
+  const { padL, pw } = geom, w = ctx.measureText(text).width;
+  let left = align === "right" ? x - w : align === "center" ? x - w / 2 : x;
+  left = Math.max(padL + 3, Math.min(left, padL + pw - w - 3));
+  ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+  ctx.lineWidth = 3; ctx.strokeStyle = css("--surface"); ctx.fillStyle = css("--fg");
+  ctx.strokeText(text, left, y); ctx.fillText(text, left, y);
+}
+
+function cellAt(d, lon, lat) {
+  const nlon = d.lons.length, nlat = d.lats.length, dlon = 360 / nlon, dlat = 180 / (nlat - 1);
+  let i = Math.round((lon + 180) / dlon) % nlon; if (i < 0) i += nlon;
+  const j = Math.max(0, Math.min(nlat - 1, Math.round((lat + 90) / dlat)));
+  return { i, j, k: j * nlon + i };
+}
+
+function hover(ev) {
+  if (!geom) return;
+  const r = canvas.getBoundingClientRect(), x = ev.clientX - r.left, y = ev.clientY - r.top;
+  const { padL, padT, pw, ph, d } = geom;
+  if (x < padL || x > padL + pw || y < padT || y > padT + ph) { tip.hidden = true; return; }
+  const lon = (x - padL) / pw * 360 - 180, lat = 90 - (y - padT) / ph * 180;
+  const c = cellAt(d, lon, lat), V = VARS[state.v];
+  const glon = d.lons[c.i], glat = d.lats[c.j];
+  tip.innerHTML = "<b>" + V.fmt(d[state.v][c.k]) + " " + V.unit + "</b><br>" + latLabel(glat) + "  " + lonLabel(glon) + "<br>τοπική ώρα " + hhmm(localTime(d, glon));
+  tip.hidden = false;
+  const flip = x > r.width - 190;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+  tip.style.transform = flip ? "translate(calc(-100% - 12px), -50%)" : "translate(12px, -50%)";
+}
+canvas.addEventListener("pointermove", hover);
+canvas.addEventListener("pointerdown", hover);
+canvas.addEventListener("pointerleave", e => { if (e.pointerType === "mouse") tip.hidden = true; });
+
+let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(render, 80); });
+try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render); } catch (e) {}
+new MutationObserver(render).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+render();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(render);
+}
+</script>
+
+</body>
+</html>
