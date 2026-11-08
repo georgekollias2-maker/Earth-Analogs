@@ -157,5 +157,19 @@ def main():
     mirror_to_streamlit()
 
 
+def main_quiet():
+    """Για το app.py: ξαναγράφει τα JSON από τα outputs/*.csv με τις προεπιλογές (χωρίς ορίσματα)."""
+    DOCS.mkdir(parents=True, exist_ok=True)
+    export_world()
+    ranking = ROOT / "outputs" / "analog_ranking.csv"
+    if not ranking.exists():
+        raise FileNotFoundError("λείπει το outputs/analog_ranking.csv")
+    export_ranking(ranking)
+    mars = sorted(glob.glob(str(ROOT / "outputs" / "mars_mcd_*.csv")))
+    if mars:
+        export_mars(mars)
+    mirror_to_streamlit()
+
+
 if __name__ == "__main__":
     main()

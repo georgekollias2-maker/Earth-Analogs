@@ -3,3 +3,14 @@ __pycache__/
 .idea/
 data/
 *.tif
+
+# Τα δεδομένα των σελίδων (μικρά JSON) ανεβαίνουν· ο κανόνας data/ είναι για τα μεγάλα αρχεία δεδομένων
+# (με **/ ισχύει όπου κι αν είναι η ρίζα του repo)
+!**/docs/data/
+!**/static/data/
+
+# γραμματοσειρές του PDF (κατεβαίνουν με npm pack, βλ. presentation/README.md)
+spaceapps-analog-kit/presentation/fonts/
+spaceapps-analog-kit/presentation/*.tgz
+spaceapps-analog-kit/presentation/map_*.png
+spaceapps-analog-kit/presentation/minerals_deck.html
